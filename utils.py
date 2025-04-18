@@ -80,3 +80,41 @@ def split_csv(file_path, output_folder):
         df_chunk.to_csv(output_file, index=False)
         print(f"Created {output_file}")
 
+def create_or_append_df(df, summary_df):
+    if df.empty:
+        df = summary_df.copy()
+    else:
+        df = pd.concat([df, summary_df])
+    return df
+
+def sum_across_levels(df, variable_name, category_name):
+    filtered_df = df.loc[(df['variable_name']==variable_name)]
+    basin_summary = filtered_df.groupby([ 'dataset', 'sample_level', 'variable_name', 'variable_code', 'year_sample'], as_index=False).sum(['value'])
+    county_summary = filtered_df.groupby(['dataset', 'sample_level', 'variable_name', 'variable_code', 'year_sample', 'county_name'], as_index=False).sum(['value'])
+    north_south_summary = filtered_df.groupby(['dataset', 'sample_level', 'variable_name', 'variable_code', 'year_sample', 'north_south'], as_index=False).sum(['value'])
+    state_summary = filtered_df.groupby(['dataset', 'sample_level', 'variable_name', 'variable_code', 'year_sample', 'state_name'], as_index=False).sum(['value'])
+    #basin_summary.rename(columns = {'variable_code': 'Code', 'year_sample': 'Year'})
+    basin_summary['Geography'] = 'Basin'
+    county_summary['Geography'] = county_summary['county_name'] 
+    north_south_summary['Geography'] = north_south_summary['north_south']
+    state_summary['Geography'] = state_summary['state_name']
+    columns_to_keep = ['variable_code','variable_name', 'value', 'Geography', 'year_sample', 'dataset', 'sample_level']
+    basin_summary= basin_summary[columns_to_keep]
+    county_summary = county_summary[columns_to_keep]
+    north_south_summary = north_south_summary[columns_to_keep]
+    state_summary = state_summary[columns_to_keep]
+    combined_summary = pd.concat([basin_summary, county_summary, north_south_summary, state_summary], ignore_index=True)
+    #if neighborhood_yn == 'Yes':
+    #    neighborhood_summary = filtered_df.groupby(['dataset', 'sample_level', 'variable_name', 'variable_code', 'year_sample', 'NEIGHBORHOOD'], as_index=False).sum(['value'])
+        #basin_summary.rename(columns = {'variable_code': 'Code', 'year_sample': 'Year'})
+    #    neighborhood_summary['Geography'] = neighborhood_summary['NEIGHBORHOOD']
+    #    combined_summary = pd.concat([combined_summary, neighborhood_summary], ignore_index=True)
+    combined_summary['Category'] = category_name
+    return combined_summary
+
+def sum_multiple_variables(df, variable_list):
+    df_values=pd.DataFrame()
+    for variable, variable_category in variable_list:
+        summed_df = sum_across_levels(df,variable, variable_category)
+        df_values = create_or_append_df(df_values, summed_df)
+    return df_values
